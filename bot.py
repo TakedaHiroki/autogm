@@ -71,12 +71,34 @@ async def on_message(message):
             await message.channel.send('あなたは'+vote.result[message.author.name]+'さんに投票しました')
         else:
             await message.channel.send('もう一度やり直してください')
+    
+    elif message.content.upper() == '/INIT':
+        new_channel = await create_log_channel(message.guild, 'ログ')
+        text = f'{new_channel.mention} を作成しました'
+        await message.channel.send(text)
+        new_channel = await create_voice_channel(message.guild, '下界')
+        text = f'{new_channel.mention} を作成しました'
+        await message.channel.send(text)
+        new_channel = await create_voice_channel(message.guild, '霊界')
+        text = f'{new_channel.mention} を作成しました'
+        await message.channel.send(text)
 
-    elif message.content.upper().startswith('\CREATE'):
+    elif message.content.upper() == '/CREATE':
         for mention in message.mentions:
-            new_channel = await create_private_text_channel(message.guild, mention.id)
+            new_channel = await create_self_channel(message.guild, mention.id)
             text = f'{new_channel.mention} を作成しました'
             await message.channel.send(text)
+
+    if message.content.upper() == '/MUTE':
+        for voice_channel in message.guild.voice_channels:
+            for member in voice_channel.members:
+                await member.edit(mute=True)
+
+    if message.content.upper() == '/UNMUTE':
+        for voice_channel in message.guild.voice_channels:
+            for member in voice_channel.members:
+                await member.edit(mute=False)
+
 
 # @bot.event
 # async def create_text_channel(message, channel_name):
@@ -86,13 +108,27 @@ async def on_message(message):
 #     return new_channel
 
 @bot.event
-async def create_private_text_channel(guild, user_id):
+async def create_log_channel(guild, name):
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(send_messages=False),
+        guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True),
+    }
+    new_channel = await guild.create_text_channel(name, overwrites=overwrites)
+    return new_channel
+
+@bot.event
+async def create_self_channel(guild, user_id):
     overwrites = {
         guild.default_role: discord.PermissionOverwrite(read_messages=False, send_messages=False),
         guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True),
         guild.get_member(user_id): discord.PermissionOverwrite(read_messages=True, send_messages=True),
     }
     new_channel = await guild.create_text_channel(bot.get_user(user_id).display_name, overwrites=overwrites)
+    return new_channel
+
+@bot.event
+async def create_voice_channel(guild, name):
+    new_channel = await guild.create_voice_channel(name)
     return new_channel
 
 bot.run(TOKEN)
