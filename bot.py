@@ -3,6 +3,7 @@ from discord.ext import commands
 
 from scheduler import Scheduler
 from classes.bite import Bite
+from classes.guard import Guard
 from classes.vote import Vote
 
 
@@ -18,7 +19,9 @@ bot = commands.Bot(
 TOKEN = ''
 
 bite = Bite()
+guard = Guard()
 vote = Vote(survivors)
+
 
 
 @bot.event
@@ -42,6 +45,15 @@ async def on_message(message):
             await message.channel.send(bite.src+'さんは'+bite.dst+'さんを噛みました')
         else:
             await message.channel.send('もう一度やり直してください')
+
+    elif message.content.startswith('護衛→'):
+        cmd, dst = message.content.split('→')
+        if cmd == '護衛' and dst in survivors:
+            guard.push(message.author.name, dst)
+            await message.channel.send(guard.src+'さんは'+guard.dst+'さんを護衛しました')
+        else:
+            await message.channel.send('もう一度やり直してください')
+            
 
     elif message.content.startswith('投票→'):
         cmd, dst = message.content.split('→')
