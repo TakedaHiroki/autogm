@@ -18,6 +18,8 @@ bot = commands.Bot(
 
 TOKEN = ''
 
+participants = []
+survivors = []
 bite = Bite()
 guard = Guard()
 vote = Vote(survivors)
@@ -81,6 +83,20 @@ async def on_message(message):
         await message.channel.send(text)
         new_channel = await create_voice_channel(message.guild, '霊界')
         text = f'{new_channel.mention} を作成しました'
+        await message.channel.send(text)
+
+    elif message.content.upper().startswith('/JOIN'):
+        for mention in message.mentions:
+            participants.append(mention.name)
+            survivors.append(mention.name)
+        text = f"{' '.join(participants)} が参加しています"
+        await message.channel.send(text)
+
+    elif message.content.upper().startswith('/LEAVE'):
+        for mention in message.mentions:
+            participants.remove(mention.name)
+            survivors.remove(mention.name)
+        text = f"{' '.join(participants)} が参加しています"
         await message.channel.send(text)
 
     elif message.content.upper().startswith('/CREATE'):
