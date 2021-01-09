@@ -1,0 +1,46 @@
+import time
+import asyncio
+
+class Scheduler():
+    def __init__(self, channel):
+        self.channel = channel
+
+    async def start(self):
+        while True:
+            if await self.nighttime():
+                break
+            if await self.daytime():
+                break
+            if await self.votetime():
+                break
+            
+    async def daytime(self):
+        await self.channel.send('昼時間です')
+        t_start = time.time()
+        while time.time() - t_start < 60:
+            await self.channel.send(str(int(time.time() - t_start)))
+            await asyncio.sleep(10)
+        else:
+            return False
+        return True
+
+    async def nighttime(self):
+        await self.channel.send('夜時間です')
+        t_start = time.time()
+        while time.time() - t_start < 30:
+            await self.channel.send(str(int(time.time() - t_start)))
+            await asyncio.sleep(10)
+        else:
+            return False
+        return True
+
+    async def votetime(self):
+        await self.channel.send('投票時間です')
+        t_start = time.time()
+        while time.time() - t_start < 30:
+            await self.channel.send(str(int(time.time() - t_start)))
+            await asyncio.sleep(10)
+        else:
+            return False
+        return True
+

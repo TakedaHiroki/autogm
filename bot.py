@@ -2,10 +2,13 @@ import discord
 from discord.ext import commands
 
 
+from scheduler import Scheduler
+
+
 intents = discord.Intents.all()
 
 bot = commands.Bot(
-    command_prefix="!",
+    command_prefix='!',
     case_insensitive=True,
     intents=intents
 )
@@ -25,9 +28,12 @@ async def on_message(message):
     if message.author.bot:
         return
 
-    new_channel = await create_private_text_channel(message)
-    text = f'{new_channel.mention} を作成しました'
-    await message.channel.send(text)
+    scheduler = Scheduler(message.channel)
+    bot.loop.create_task(scheduler.start())
+
+    # new_channel = await create_private_text_channel(message)
+    # text = f'{new_channel.mention} を作成しました'
+    # await message.channel.send(text)
 
 @bot.event
 async def create_text_channel(message, channel_name):
