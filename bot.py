@@ -83,7 +83,7 @@ async def on_message(message):
         text = f'{new_channel.mention} を作成しました'
         await message.channel.send(text)
 
-    elif message.content.upper() == '/CREATE':
+    elif message.content.upper().startswith('/CREATE'):
         for mention in message.mentions:
             new_channel = await create_self_channel(message.guild, mention.id)
             text = f'{new_channel.mention} を作成しました'
@@ -98,6 +98,14 @@ async def on_message(message):
         for voice_channel in message.guild.voice_channels:
             for member in voice_channel.members:
                 await member.edit(mute=False)
+
+    if message.content.upper().startswith('/MOVE'):
+        given_name = message.content.split(' ')[-1]
+        for channel in message.guild.channels:
+            if channel.name == given_name:
+                for mention in message.mentions:
+                    await mention.move_to(channel)
+
 
 
 # @bot.event
