@@ -1,8 +1,8 @@
 import discord
 from discord.ext import commands
 
-
 from scheduler import Scheduler
+from classes.vote import Vote
 
 
 intents = discord.Intents.all()
@@ -16,6 +16,9 @@ bot = commands.Bot(
 
 TOKEN = ''
 
+survivors = ['とがし', 'Zlatan']
+vote = Vote(survivors)
+
 
 
 @bot.event
@@ -28,8 +31,17 @@ async def on_message(message):
     if message.author.bot:
         return
 
-    scheduler = Scheduler(message.channel)
-    bot.loop.create_task(scheduler.start())
+    elif message.content.startswith('開始'):
+        scheduler = Scheduler(message.channel)
+        bot.loop.create_task(scheduler.start())
+
+    elif message.content.startswith('投票→'):
+        cmd, dst = message.content.split('→')
+        if cmd == '投票' and dst in survivors:
+            vote.push(message.author.name, dst)
+            await message.channel.send(dst+'さんに投票しました')
+        else:
+            await message.channel.send('もう一度やり直してください')
 
     # new_channel = await create_private_text_channel(message)
     # text = f'{new_channel.mention} を作成しました'
