@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 
 from scheduler import Scheduler
+from classes.bite import Bite
 from classes.vote import Vote
 
 
@@ -16,9 +17,8 @@ bot = commands.Bot(
 
 TOKEN = ''
 
-survivors = ['とがし', 'Zlatan']
+bite = Bite()
 vote = Vote(survivors)
-
 
 
 @bot.event
@@ -35,11 +35,19 @@ async def on_message(message):
         scheduler = Scheduler(message.channel)
         bot.loop.create_task(scheduler.start())
 
+    elif message.content.startswith('噛み→'):
+        cmd, dst = message.content.split('→')
+        if cmd == '噛み' and dst in survivors:
+            bite.push(message.author.name, dst)
+            await message.channel.send(bite.src+'さんは'+bite.dst+'さんを噛みました')
+        else:
+            await message.channel.send('もう一度やり直してください')
+
     elif message.content.startswith('投票→'):
         cmd, dst = message.content.split('→')
         if cmd == '投票' and dst in survivors:
             vote.push(message.author.name, dst)
-            await message.channel.send(dst+'さんに投票しました')
+            await message.channel.send('あなたは'+vote.result[message.author.name]+'さんに投票しました')
         else:
             await message.channel.send('もう一度やり直してください')
 
