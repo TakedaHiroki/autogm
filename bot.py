@@ -1,3 +1,5 @@
+import asyncio
+
 import discord
 from discord.ext import commands
 
@@ -16,7 +18,7 @@ bot = commands.Bot(
 )
 
 
-TOKEN = 'Nzk3MTY0Mzk3OTMwODcyOTMz.X_ifMw.r5oq1dEfEu3Zl0O2Il-b8H7g89U'
+TOKEN = ''
 
 participants = []
 survivors = []
@@ -47,7 +49,10 @@ async def on_message(message):
         return
 
     elif message.content.startswith('開始'):
-        scheduler = Scheduler(message.channel, participants)
+        log_channel = await get_channel(message.guild, 'log')
+        times_channel = await get_channel(message.guild, 'times')
+        scheduler = Scheduler(log_channel, times_channel, participants)
+        await asyncio.sleep(10)
         bot.loop.create_task(scheduler.start())
 
     elif message.content.startswith('噛み→'):
@@ -75,7 +80,19 @@ async def on_message(message):
             await message.channel.send('もう一度やり直してください')
     
     elif message.content.upper() == '/INIT':
-        new_channel = await create_log_channel(message.guild, 'ログ')
+        for channel in message.guild.channels:
+            if channel.name == 'log':
+                await channel.delete()
+            elif channel.name == 'times':
+                await channel.delete()
+            elif channel.name == '下界':
+                await channel.delete()
+            elif channel.name == '霊界':
+                await channel.delete()
+        new_channel = await create_log_channel(message.guild, 'log')
+        text = f'{new_channel.mention} を作成しました'
+        await message.channel.send(text)
+        new_channel = await create_log_channel(message.guild, 'times')
         text = f'{new_channel.mention} を作成しました'
         await message.channel.send(text)
         new_channel = await create_voice_channel(message.guild, '下界')
@@ -123,6 +140,12 @@ async def on_message(message):
                     await mention.move_to(channel)
 
 
+@bot.command()
+async def get_channel(guild, given_name):
+    for channel in guild.channels:
+        if channel.name == given_name:
+            return channel
+
 
 # @bot.event
 # async def create_text_channel(message, channel_name):
@@ -154,5 +177,6 @@ async def create_self_channel(guild, user_id):
 async def create_voice_channel(guild, name):
     new_channel = await guild.create_voice_channel(name)
     return new_channel
+
 
 bot.run(TOKEN)
