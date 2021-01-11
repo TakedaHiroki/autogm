@@ -16,7 +16,7 @@ bot = commands.Bot(
 )
 
 
-TOKEN = ''
+TOKEN = 'Nzk3MTY0Mzk3OTMwODcyOTMz.X_ifMw.r5oq1dEfEu3Zl0O2Il-b8H7g89U'
 
 participants = []
 survivors = []
@@ -47,7 +47,7 @@ async def on_message(message):
         return
 
     elif message.content.startswith('開始'):
-        scheduler = Scheduler(message.channel)
+        scheduler = Scheduler(message.channel, participants)
         bot.loop.create_task(scheduler.start())
 
     elif message.content.startswith('噛み→'):

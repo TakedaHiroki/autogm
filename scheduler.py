@@ -2,7 +2,7 @@ import time
 import asyncio
 
 class Scheduler():
-    def __init__(self, channel):
+    def __init__(self, channel, participants):
         self.channel = channel
 
     async def start(self):
