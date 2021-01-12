@@ -48,13 +48,6 @@ async def on_message(message):
     if message.author.bot:
         return
 
-    elif message.content.startswith('開始'):
-        log_channel = await get_channel(message.guild, 'log')
-        times_channel = await get_channel(message.guild, 'times')
-        scheduler = Scheduler(log_channel, times_channel, participants)
-        await asyncio.sleep(10)
-        bot.loop.create_task(scheduler.start())
-
     elif message.content.startswith('噛み→'):
         cmd, dst = message.content.split('→')
         if cmd == '噛み' and dst in survivors:
@@ -138,6 +131,13 @@ async def on_message(message):
             if channel.name == given_name:
                 for mention in message.mentions:
                     await mention.move_to(channel)
+
+    elif message.content.upper() == '/START':
+        log_channel = await get_channel(message.guild, 'log')
+        times_channel = await get_channel(message.guild, 'times')
+        scheduler = Scheduler(log_channel, times_channel, participants)
+        await asyncio.sleep(10)
+        bot.loop.create_task(scheduler.start())
 
 
 @bot.command()
