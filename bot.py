@@ -17,16 +17,30 @@ bot = commands.Bot(
 
 TOKEN = ''
 
+# cast = {
+#     "村人" : 5,
+#     "人狼" : 2,
+#     "占い師" : 1,
+#     "霊能者" : 1,
+#     "狩人" : 1,
+#     "狂人" : 1,
+#     "妖狐" : 1
+# }
+
 cast = {
-    "村人" : 5,
-    "人狼" : 2,
-    "占い師" : 1,
-    "霊能者" : 1,
-    "狩人" : 1,
-    "狂人" : 1,
-    "妖狐" : 1
+    "村人" : 2,
+    "人狼" : 1,
+    "占い師" : 0,
+    "霊能者" : 0,
+    "狩人" : 0,
+    "狂人" : 0,
+    "妖狐" : 0
 }
 
+
+user_info = {}
+# participants = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']
+# survivors = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']
 participants = []
 survivors = []
 death = []
@@ -101,6 +115,7 @@ async def on_message(message):
         for mention in message.mentions:
             participants.append(mention.name)
             survivors.append(mention.name)
+            user_info[mention.name.lower()] = mention.id
         text = f"{' '.join(participants)} が参加しています"
         await message.channel.send(text)
 
@@ -108,6 +123,7 @@ async def on_message(message):
         for mention in message.mentions:
             participants.remove(mention.name)
             survivors.remove(mention.name)
+            del user_info[mention.name.lower()]
         text = f"{' '.join(participants)} が参加しています"
         await message.channel.send(text)
 
@@ -137,7 +153,7 @@ async def on_message(message):
     elif message.content.upper() == '/START':
         log_channel = await get_channel(message.guild, 'log')
         times_channel = await get_channel(message.guild, 'times')
-        bot.loop.create_task(start(times_channel, roles))
+        bot.loop.create_task(start(message.guild, times_channel, roles))
 
 
 @bot.command()
@@ -165,45 +181,58 @@ async def create_self_channel(guild, user_id):
     new_channel = await guild.create_text_channel(bot.get_user(user_id).display_name, overwrites=overwrites)
     return new_channel
 
+async def enable_channel_writing(guild, channel):
+    member = guild.get_member(user_info[channel.name])
+    await channel.set_permissions(member, read_messages=True, send_messages=True)
+
+async def disable_channel_writing(guild, channel):
+    member = guild.get_member(user_info[channel.name])
+    await channel.set_permissions(member, read_messages=True, send_messages=False)
+
 @bot.event
 async def create_voice_channel(guild, name):
     new_channel = await guild.create_voice_channel(name)
     return new_channel
 
-async def start(times_channel, roles):
+async def start(guild, times_channel, roles):
     await vote_init(survivors)
     await guard_init()
     await distribute_roles(roles)
-    await times_channel.send('昼時間です')
     while True:
-        if await nighttime(times_channel):
+        if await nighttime(guild, times_channel):
             break
-        if await daytime(times_channel):
+        if await daytime(guild, times_channel):
             break
-        if await votetime(times_channel):
+        if await votetime(guild, times_channel):
             break
         
-async def daytime(times_channel):
+async def daytime(guild, times_channel):
+    for survivor in survivors:
+        channel = await get_channel(guild, survivor.lower())
+        await disable_channel_writing(guild, channel)
     await times_channel.send('昼時間です')
     t_start = time.time()
-    while time.time() - t_start < 60:
+    while time.time() - t_start < 10:
         await times_channel.send(str(int(time.time() - t_start)))
         await asyncio.sleep(10)
     else:
         return False
     return True
 
-async def nighttime(times_channel):
+async def nighttime(guild, times_channel):
     await times_channel.send('夜時間です')
     t_start = time.time()
-    while time.time() - t_start < 30:
+    while time.time() - t_start < 10:
         await times_channel.send(str(int(time.time() - t_start)))
         await asyncio.sleep(10)
     else:
         return False
     return True
 
-async def votetime(times_channel):
+async def votetime(guild, times_channel):
+    for survivor in survivors:
+        channel = await get_channel(guild, survivor.lower())
+        await enable_channel_writing(guild, channel)
     await times_channel.send('投票時間です')
     t_start = time.time()
     while time.time() - t_start < 30:
