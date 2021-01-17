@@ -1,12 +1,9 @@
 import asyncio
+import random
+import time
 
 import discord
 from discord.ext import commands
-
-from scheduler import Scheduler
-from classes.bite import Bite
-from classes.guard import Guard
-from classes.vote import Vote
 
 
 intents = discord.Intents.all()
@@ -20,23 +17,25 @@ bot = commands.Bot(
 
 TOKEN = ''
 
+cast = {
+    "村人" : 5,
+    "人狼" : 2,
+    "占い師" : 1,
+    "霊能者" : 1,
+    "狩人" : 1,
+    "狂人" : 1,
+    "妖狐" : 1
+}
+
 participants = []
 survivors = []
-bite = Bite()
-guard = Guard()
-vote = Vote(survivors)
+death = []
+roles = []
+allocation = {}
+bite_results = {}
+guard_results = {}
+vote_results = {}
 
-
-def get_data(message):
-    command = message.content
-    data_table = {
-        '/members': message.guild.members,
-        '/roles': message.guild.roles,
-        '/text_channels': message.guild.text_channels,
-        '/voice_channels': message.guild.voice_channels,
-        '/category_channels': message.guild.categories,
-    }
-    return data_table.get(command, '無効なコマンドです')
 
 @bot.event
 async def on_ready():
@@ -49,26 +48,29 @@ async def on_message(message):
         return
 
     elif message.content.startswith('噛み→'):
-        cmd, dst = message.content.split('→')
-        if cmd == '噛み' and dst in survivors:
-            bite.push(message.author.name, dst)
-            await message.channel.send(bite.src+'さんは'+bite.dst+'さんを噛みました')
-        else:
-            await message.channel.send('もう一度やり直してください')
+        allocation[message.author.name] = '人狼'
+        if allocation[message.author.name] == '人狼':
+            cmd, dst = message.content.split('→')
+            if cmd == '噛み' and dst in survivors:
+                await bite_push(message.author.name, dst)
+                await message.channel.send(message.author.name+'さんは'+bite_results[message.author.name]+'さんを噛みました')
+            else:
+                await message.channel.send('もう一度やり直してください')
 
     elif message.content.startswith('護衛→'):
-        cmd, dst = message.content.split('→')
-        if cmd == '護衛' and dst in survivors:
-            guard.push(message.author.name, dst)
-            await message.channel.send(guard.src+'さんは'+guard.dst+'さんを護衛しました')
-        else:
-            await message.channel.send('もう一度やり直してください')
+        if allocation[message.author.name] == '狩人':
+            cmd, dst = message.content.split('→')
+            if cmd == '護衛' and dst in survivors:
+                await guard_push(message.author.name, dst)
+                await message.channel.send(message.author.name+'さんは'+guard_results[message.author.name]+'さんを護衛しました')
+            else:
+                await message.channel.send('もう一度やり直してください')
             
     elif message.content.startswith('投票→'):
         cmd, dst = message.content.split('→')
         if cmd == '投票' and dst in survivors:
-            vote.push(message.author.name, dst)
-            await message.channel.send('あなたは'+vote.result[message.author.name]+'さんに投票しました')
+            await vote_push(message.author.name, dst)
+            await message.channel.send('あなたは'+vote_results[message.author.name]+'さんに投票しました')
         else:
             await message.channel.send('もう一度やり直してください')
     
@@ -135,9 +137,7 @@ async def on_message(message):
     elif message.content.upper() == '/START':
         log_channel = await get_channel(message.guild, 'log')
         times_channel = await get_channel(message.guild, 'times')
-        scheduler = Scheduler(log_channel, times_channel, participants)
-        await asyncio.sleep(10)
-        bot.loop.create_task(scheduler.start())
+        bot.loop.create_task(start(times_channel, roles))
 
 
 @bot.command()
@@ -145,14 +145,6 @@ async def get_channel(guild, given_name):
     for channel in guild.channels:
         if channel.name == given_name:
             return channel
-
-
-# @bot.event
-# async def create_text_channel(message, channel_name):
-#     category_id = message.channel.category_id
-#     category = message.guild.get_channel(category_id)
-#     new_channel = await category.create_text_channel(name=channel_name)
-#     return new_channel
 
 @bot.event
 async def create_log_channel(guild, name):
@@ -178,5 +170,88 @@ async def create_voice_channel(guild, name):
     new_channel = await guild.create_voice_channel(name)
     return new_channel
 
+async def start(times_channel, roles):
+    await vote_init(survivors)
+    await guard_init()
+    await distribute_roles(roles)
+    await times_channel.send('昼時間です')
+    while True:
+        if await nighttime(times_channel):
+            break
+        if await daytime(times_channel):
+            break
+        if await votetime(times_channel):
+            break
+        
+async def daytime(times_channel):
+    await times_channel.send('昼時間です')
+    t_start = time.time()
+    while time.time() - t_start < 60:
+        await times_channel.send(str(int(time.time() - t_start)))
+        await asyncio.sleep(10)
+    else:
+        return False
+    return True
+
+async def nighttime(times_channel):
+    await times_channel.send('夜時間です')
+    t_start = time.time()
+    while time.time() - t_start < 30:
+        await times_channel.send(str(int(time.time() - t_start)))
+        await asyncio.sleep(10)
+    else:
+        return False
+    return True
+
+async def votetime(times_channel):
+    await times_channel.send('投票時間です')
+    t_start = time.time()
+    while time.time() - t_start < 30:
+        await times_channel.send(str(int(time.time() - t_start)))
+        await asyncio.sleep(10)
+    else:
+        return False
+    return True
+
+async def decide_missing_role(roles):
+    roles += cast['村人'] * [1]
+    roles += cast['占い師'] * [3]
+    roles += cast['霊能者'] * [4]
+    roles += cast['狩人'] * [5]
+    roles += cast['狂人'] * [6]
+    random.shuffle(roles)
+    missing_role = roles.pop(0)
+    return missing_role
+    
+
+async def distribute_roles(roles):
+    missing_role = await decide_missing_role(roles)
+    print(missing_role)
+    roles += cast['人狼'] * [2]
+    roles += cast['妖狐'] * [7]
+    random.shuffle(participants)
+    random.shuffle(roles)
+    for idx in range(len(participants)):
+        allocation[participants[idx]] = roles[idx]
+
+async def bite_init():
+    bite_results.clear()
+
+async def bite_push(src, dst):
+    bite_results[src] = dst
+
+async def guard_init():
+    guard_results.clear()
+
+async def guard_push(src, dst):
+    guard_results[src] = dst
+
+async def vote_init(survivors):
+    vote_results.clear()
+    for survivor in survivors:
+        vote_results[survivor] = ''
+
+async def vote_push(src, dst):
+    vote_results[src] = dst
 
 bot.run(TOKEN)
