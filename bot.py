@@ -153,7 +153,7 @@ async def on_message(message):
     elif message.content.upper() == '/START':
         log_channel = await get_channel(message.guild, 'log')
         times_channel = await get_channel(message.guild, 'times')
-        bot.loop.create_task(start(message.guild, times_channel, roles))
+        bot.loop.create_task(start(message.guild, log_channel, times_channel, roles))
 
 
 @bot.command()
@@ -194,19 +194,33 @@ async def create_voice_channel(guild, name):
     new_channel = await guild.create_voice_channel(name)
     return new_channel
 
-async def start(guild, times_channel, roles):
+async def start(guild, log_channel, times_channel, roles):
     await vote_init(survivors)
     await guard_init()
     await distribute_roles(roles)
     while True:
         if await nighttime(guild, times_channel):
             break
-        if await daytime(guild, times_channel):
+        if await daytime(guild, log_channel, times_channel):
             break
         if await votetime(guild, times_channel):
             break
         
-async def daytime(guild, times_channel):
+async def daytime(guild, log_channel, times_channel):
+    bite_result = list(bite_results.values())[0]
+    for v in guard_results.values():
+        if v == bite_result or allocation[bite_result] == '妖狐':
+            text = '平和な朝を迎えました'
+            await log_channel.send(text)
+        else:
+            text = '「' + bite_result + '」さんが無残な姿で発見されました'
+            await log_channel.send(text)
+            survivors.remove(bite_result)
+            death.append(bite_result)
+            channel = await get_channel(guild, bite_result.lower())
+            disable_channel_writing(guild, channel)
+    await bite_init()
+    await guard_init()
     for survivor in survivors:
         channel = await get_channel(guild, survivor.lower())
         await disable_channel_writing(guild, channel)
@@ -235,7 +249,7 @@ async def votetime(guild, times_channel):
         await enable_channel_writing(guild, channel)
     await times_channel.send('投票時間です')
     t_start = time.time()
-    while time.time() - t_start < 30:
+    while time.time() - t_start < 10:
         await times_channel.send(str(int(time.time() - t_start)))
         await asyncio.sleep(10)
     else:
