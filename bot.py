@@ -18,30 +18,8 @@ bot = commands.Bot(
 
 TOKEN = ''
 
-# cast = {
-#     "村人" : 5,
-#     "人狼" : 2,
-#     "占い師" : 1,
-#     "霊能者" : 1,
-#     "狩人" : 1,
-#     "狂人" : 1,
-#     "妖狐" : 1
-# }
-
-cast = {
-    "村人" : 3,
-    "人狼" : 1,
-    "占い師" : 0,
-    "霊能者" : 0,
-    "狩人" : 0,
-    "狂人" : 0,
-    "妖狐" : 0
-}
-
 day = 1
 user_info = {}
-# participants = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']
-# survivors = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']
 participants = []
 survivors = []
 death = []
@@ -201,114 +179,108 @@ async def start(guild, log_channel, times_channel, roles):
     await init_guard()
     await distribute_roles(roles)
     while True:
-        if await nighttime_count(guild, log_channel, times_channel):
+        await times_channel.send('夜時間です')
+        if await count_rest_time(guild, log_channel, times_channel, 10):
             break
-
         day += 1
-        bite_result = list(bite_results.values())[0]
-        for v in guard_results.values():
-            if v == bite_result or allocation[bite_result] == '妖狐':
-                text = '----------------------------------------------------------------\n■' + str(day) + '日目の朝になりました\n平和な朝を迎えました'
-                await log_channel.send(text)
-            else:
-                text = '----------------------------------------------------------------\n■' + str(day) + '日目の朝になりました\n「' + bite_result + '」さんが無残な姿で発見されました'
-                await log_channel.send(text)
-                survivors.remove(bite_result)
-                death.append(bite_result)
-                channel = await get_channel(guild, bite_result.lower())
-                disable_channel_writing(guild, channel)
-        await init_bite()
-        await init_guard()
+        await bite_process(guild, log_channel)
+        if await check_game_end(log_channel):
+            break
         for survivor in survivors:
             channel = await get_channel(guild, survivor.lower())
             await disable_channel_writing(guild, channel)
-
-        if await daytime_count(guild, log_channel, times_channel):
+        await times_channel.send('昼時間です')
+        if await count_rest_time(guild, log_channel, times_channel, 10):
             break
-
-        for survivor in survivors:
-            channel = await get_channel(guild, survivor.lower())
-            await enable_channel_writing(guild, channel)
-        if await votetime_count(guild, times_channel):
+        if await vote_process(guild, log_channel, times_channel, 10):
             break
+        if await check_game_end(log_channel):
+            break
+        
+async def count_rest_time(guild, log_channel, times_channel, t):
+    t_start = time.time()
+    while time.time() - t_start < t:
+        await times_channel.send(str(int(time.time() - t_start)))
+        await asyncio.sleep(10)
+    else:
+        return False
+    return True
+
+async def bite_process(guild, log_channel):
+    bite_result = list(bite_results.values())[0]
+    for v in guard_results.values():
+        if v == bite_result or allocation[bite_result] == '妖狐':
+            text = '----------------------------------------------------------------\n■' + str(day) + '日目の朝になりました\n平和な朝を迎えました'
+            await log_channel.send(text)
+        else:
+            text = '----------------------------------------------------------------\n■' + str(day) + '日目の朝になりました\n「' + bite_result + '」さんが無残な姿で発見されました'
+            await log_channel.send(text)
+            survivors.remove(bite_result)
+            death.append(bite_result)
+            print(bite_result)
+            print(survivors)
+            print(death)
+            channel = await get_channel(guild, bite_result.lower())
+            await disable_channel_writing(guild, channel)
+    await init_bite()
+    await init_guard()
+    pass
+
+async def vote_process(guild, log_channel, times_channel, t):
+    for survivor in survivors:
+        channel = await get_channel(guild, survivor.lower())
+        await enable_channel_writing(guild, channel)
+    await times_channel.send('投票時間です')
+    if await count_rest_time(guild, log_channel, times_channel, t):
+        return True
+    most_voted_participant = [participant for participant, count in Counter(list(vote_results.values())).most_common() if count == Counter(list(vote_results.values())).most_common()[0][1]]
+    text = '----------------------------------------------------------------\n■' + str(day) + '日目：1回目の投票結果\n'
+    num_voted = Counter(list(vote_results.values()))
+    for survivor in survivors:
+        text += survivor + ' ' + str(num_voted[survivor]) + '票 投票先 → ' + vote_results[survivor] + '\n'
+    await log_channel.send(text)
+    if not len(most_voted_participant) == 1:
+        await times_channel.send('再投票です')
+        if await count_rest_time(guild, log_channel, times_channel, t):
+            return True
         most_voted_participant = [participant for participant, count in Counter(list(vote_results.values())).most_common() if count == Counter(list(vote_results.values())).most_common()[0][1]]
-        text = '----------------------------------------------------------------\n■' + str(day) + '日目：1回目の投票結果\n'
+        text = '----------------------------------------------------------------\n■' + str(day) + '日目：2回目の投票結果\n'
         num_voted = Counter(list(vote_results.values()))
         for survivor in survivors:
             text += survivor + ' ' + str(num_voted[survivor]) + '票 投票先 → ' + vote_results[survivor] + '\n'
         await log_channel.send(text)
-
         if not len(most_voted_participant) == 1:
-            if await votetime_count(guild, times_channel):
-                break
+            await times_channel.send('再投票です')
+            if await count_rest_time(guild, log_channel, times_channel, t):
+                return True
             most_voted_participant = [participant for participant, count in Counter(list(vote_results.values())).most_common() if count == Counter(list(vote_results.values())).most_common()[0][1]]
-            text = '----------------------------------------------------------------\n■' + str(day) + '日目：2回目の投票結果\n'
+            text = '----------------------------------------------------------------\n■' + str(day) + '日目：3回目の投票結果\n'
             num_voted = Counter(list(vote_results.values()))
             for survivor in survivors:
                 text += survivor + ' ' + str(num_voted[survivor]) + '票 投票先 → ' + vote_results[survivor] + '\n'
             await log_channel.send(text)
-
             if not len(most_voted_participant) == 1:
-                if await votetime_count(guild, times_channel):
-                    break
+                await times_channel.send('再投票です')
+                if await count_rest_time(guild, log_channel, times_channel, t):
+                    return True
                 most_voted_participant = [participant for participant, count in Counter(list(vote_results.values())).most_common() if count == Counter(list(vote_results.values())).most_common()[0][1]]
-                text = '----------------------------------------------------------------\n■' + str(day) + '日目：3回目の投票結果\n'
+                text = '----------------------------------------------------------------\n■' + str(day) + '日目：4回目の投票結果\n'
                 num_voted = Counter(list(vote_results.values()))
                 for survivor in survivors:
                     text += survivor + ' ' + str(num_voted[survivor]) + '票 投票先 → ' + vote_results[survivor] + '\n'
                 await log_channel.send(text)
-
                 if not len(most_voted_participant) == 1:
-                    if await votetime_count(guild, times_channel):
-                        break
-                    most_voted_participant = [participant for participant, count in Counter(list(vote_results.values())).most_common() if count == Counter(list(vote_results.values())).most_common()[0][1]]
-                    text = '----------------------------------------------------------------\n■' + str(day) + '日目：4回目の投票結果\n'
-                    num_voted = Counter(list(vote_results.values()))
-                    for survivor in survivors:
-                        text += survivor + ' ' + str(num_voted[survivor]) + '票 投票先 → ' + vote_results[survivor] + '\n'
+                    text = '引き分けです'
                     await log_channel.send(text)
-
-                    if not len(most_voted_participant) == 1:
-                        text = '引き分けです'
-                        await log_channel.send(text)
-
-        vote_result = most_voted_participant[0]
-        survivors.remove(vote_result)
-        death.append(vote_result)
-        channel = await get_channel(guild, vote_result.lower())
-        disable_channel_writing(guild, channel)
-        await init_vote(survivors)
-        
-async def daytime_count(guild, log_channel, times_channel):
-    await times_channel.send('昼時間です')
-    t_start = time.time()
-    while time.time() - t_start < 10:
-        await times_channel.send(str(int(time.time() - t_start)))
-        await asyncio.sleep(10)
-    else:
-        return False
-    return True
-
-async def nighttime_count(guild, log_channel, times_channel):
-    await times_channel.send('夜時間です')
-    t_start = time.time()
-    while time.time() - t_start < 10:
-        await times_channel.send(str(int(time.time() - t_start)))
-        await asyncio.sleep(10)
-    else:
-        return False
-    return True
-
-async def votetime_count(guild, times_channel):
-    await times_channel.send('投票時間です')
-    t_start = time.time()
-    while time.time() - t_start < 10:
-        await times_channel.send(str(int(time.time() - t_start)))
-        await asyncio.sleep(10)
-    else:
-        return False
-    return True
-
+                    return True
+    vote_result = most_voted_participant[0]
+    survivors.remove(vote_result)
+    death.append(vote_result)
+    channel = await get_channel(guild, vote_result.lower())
+    await disable_channel_writing(guild, channel)
+    await init_vote(survivors)
+    return False
+    
 async def decide_missing_role(roles):
     roles += cast['村人'] * [1]
     roles += cast['占い師'] * [3]
@@ -319,7 +291,6 @@ async def decide_missing_role(roles):
     missing_role = roles.pop(0)
     return missing_role
     
-
 async def distribute_roles(roles):
     missing_role = await decide_missing_role(roles)
     print(missing_role)
@@ -329,6 +300,38 @@ async def distribute_roles(roles):
     random.shuffle(roles)
     for idx in range(len(participants)):
         allocation[participants[idx]] = roles[idx]
+
+async def check_game_end(log_channel):
+    num_wolves = 0
+    num_foxes = 0
+    for survivor in survivors:
+        if allocation[survivor] == 2:
+            num_wolves += 1
+        elif allocation[survivor] == 7:
+            num_foxes += 1
+    if num_wolves == 0:
+        if num_foxes == 0:
+            print(allocation)
+            text = '「村 人」陣営の勝利です！！'
+            await log_channel.send(text)
+            return True
+        else:
+            print(allocation)
+            text = '「妖 狐」陣営の勝利です！！'
+            await log_channel.send(text)
+            return True
+    if len(survivors) - num_foxes <= num_wolves * 2:
+        if num_foxes == 0:
+            print(allocation)
+            text = '「人 狼」陣営の勝利です！！'
+            await log_channel.send(text)
+            return True
+        else:
+            print(allocation)
+            text = '「妖 狐」陣営の勝利です！！'
+            await log_channel.send(text)
+            return True
+    return False
 
 async def init_bite():
     bite_results.clear()
@@ -350,13 +353,5 @@ async def init_vote(survivors):
 async def push_push(src, dst):
     vote_results[src] = dst
 
-# async def count_vote():
-#     vote_summary = {}
-#     for survivor in survivors:
-#         vote_summary[survivor] = {'得票数' : 0, '投票先' : ''}
-#     for k, v in vote_results.items():
-#         vote_summary[k]['投票先'] = v
-#         vote_summary[v]['得票数'] += 1
-#     return vote_summary
 
 bot.run(TOKEN)
