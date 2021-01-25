@@ -1,0 +1,1 @@
+autogm: python bot.py
