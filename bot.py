@@ -1,3 +1,5 @@
+import os
+
 import discord
 from discord.ext import commands
 
@@ -13,12 +15,8 @@ bot = commands.Bot(
     intents=intents
 )
 
-TOKEN = ''
+DISCORD_BOT_TOKEN = os.environ['DISCORD_BOT_TOKEN']
 
-
-@bot.event
-async def on_ready():
-    print('ログインしました')
 
 @bot.event
 async def on_message(message):
@@ -155,4 +153,4 @@ async def create_voice_channel(guild, name):
     return new_channel
 
 
-bot.run(TOKEN)
+bot.run(DISCORD_BOT_TOKEN)
