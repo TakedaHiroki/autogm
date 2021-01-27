@@ -24,7 +24,7 @@ async def on_message(message):
         return
     
     # set channels
-    elif message.content.upper() == '/INIT':
+    elif message.content == '.ag i':
         for channel in message.guild.channels:
             if channel.name == 'log':
                 await channel.delete()
@@ -48,22 +48,38 @@ async def on_message(message):
         await message.channel.send(text)
 
     # start game
-    elif message.content.upper() == '/START':
+    elif message.content == '.ag s':
+        settings.day = 1
+        settings.survivors = settings.participants[:]
+        settings.death = []
+        settings.roles = []
+        settings.allocation = {}
+        settings.is_game_end = False
         log_channel = await get_channel(message.guild, 'log')
         times_channel = await get_channel(message.guild, 'times')
         bot.loop.create_task(start_game(message.guild, log_channel, times_channel, settings.roles))
 
+    # end game
+    elif message.content == '.ag e':
+        if not settings.is_game_end:
+            text = '----------------------------------------------------------------\n'
+            log_channel = await get_channel(message.guild, 'log')
+            for survivor in settings.survivors:
+                text += ('「' + str(survivor) +'」さんは無残な姿で発見されました\n')
+            text += 'この村は廃村になりました……。'
+            await log_channel.send(text)
+            settings.is_game_end = True
+
     # join members with mention
-    elif message.content.upper().startswith('/JOIN'):
+    elif message.content.startswith('.ag j'):
         for mention in message.mentions:
             settings.participants.append(mention.name)
-            settings.survivors.append(mention.name)
             settings.user_info[mention.name.lower()] = mention.id
         text = f"{' '.join(settings.participants)} が参加しています"
         await message.channel.send(text)
 
     # leave members with mention
-    elif message.content.upper().startswith('/LEAVE'):
+    elif message.content.startswith('.ag l'):
         for mention in message.mentions:
             settings.participants.remove(mention.name)
             settings.survivors.remove(mention.name)
@@ -72,31 +88,23 @@ async def on_message(message):
         await message.channel.send(text)
 
     # create channels for members
-    elif message.content.upper().startswith('/CREATE'):
+    elif message.content.startswith('ag c'):
         for mention in message.mentions:
             new_channel = await create_self_channel(message.guild, mention.id)
             text = f'{new_channel.mention} を作成しました'
             await message.channel.send(text)
 
     # mute voice channel
-    if message.content.upper() == '/MUTE':
+    if message.content == '.ag m':
         for voice_channel in message.guild.voice_channels:
             for member in voice_channel.members:
                 await member.edit(mute=True)
 
     # unmute voice channel
-    if message.content.upper() == '/UNMUTE':
+    if message.content == '.ag um':
         for voice_channel in message.guild.voice_channels:
             for member in voice_channel.members:
                 await member.edit(mute=False)
-
-    # move member to other voice channel
-    if message.content.upper().startswith('/MOVE'):
-        given_name = message.content.split(' ')[-1]
-        for channel in message.guild.channels:
-            if channel.name == given_name:
-                for mention in message.mentions:
-                    await mention.move_to(channel)
 
     # bite action
     elif message.content.startswith('噛み→'):

@@ -5,7 +5,7 @@ class Bite:
     async def reset(self):
         self.results.clear()
 
-    async def push(src, dst):
+    async def push(self, src, dst):
         self.results[src] = dst
 
 

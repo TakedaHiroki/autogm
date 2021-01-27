@@ -1,5 +1,6 @@
 from classes import Bite, Guard, Vote
 
+is_game_end = True
 day = 1
 user_info = {}
 participants = []

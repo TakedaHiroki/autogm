@@ -12,15 +12,14 @@ async def get_channel(guild, given_name):
             return channel
 
 async def enable_channel_writing(guild, channel):
-    member = guild.get_member(settings.user_info[channel.name])
+    member = guild.get_member(settings.user_info[channel.name.lower()])
     await channel.set_permissions(member, read_messages=True, send_messages=True)
 
 async def disable_channel_writing(guild, channel):
-    member = guild.get_member(settings.user_info[channel.name])
+    member = guild.get_member(settings.user_info[channel.name.lower()])
     await channel.set_permissions(member, read_messages=True, send_messages=False)
 
 async def start_game(guild, log_channel, times_channel, roles):
-    await settings.vote.reset(settings.survivors)
     await distribute_roles(roles)
     while True:
         await times_channel.send('夜時間です')
@@ -44,14 +43,14 @@ async def start_game(guild, log_channel, times_channel, roles):
 async def bite_process(guild, log_channel):
     bite_result = list(settings.bite.results.values())[0]
     for v in settings.guard.results.values():
-        if v == bite_result or settings.allocation[bite_result] == '妖狐':
+        if v == bite_result or settings.allocation[bite_result.lower()] == '妖狐':
             text = '----------------------------------------------------------------\n■' + str(settings.day) + '日目の朝になりました\n平和な朝を迎えました'
             await log_channel.send(text)
         else:
             text = '----------------------------------------------------------------\n■' + str(settings.day) + '日目の朝になりました\n「' + bite_result + '」さんが無残な姿で発見されました'
             await log_channel.send(text)
             settings.survivors.remove(bite_result)
-            variable.death.append(bite_result)
+            settings.death.append(bite_result)
             channel = await get_channel(guild, bite_result.lower())
             await disable_channel_writing(guild, channel)
     await settings.bite.reset()
@@ -107,10 +106,11 @@ async def vote_process(guild, log_channel, times_channel, t):
                     return True
     vote_result = most_voted_participant[0]
     settings.survivors.remove(vote_result)
-    variable.death.append(vote_result)
+    settings.death.append(vote_result)
+    await settings.vote.reset(settings.survivors)
+    await log_channel.send('「' + str(vote_result) + '」さんは村民協議の結果、処刑されました')
     channel = await get_channel(guild, vote_result.lower())
     await disable_channel_writing(guild, channel)
-    await settings.guard.reset(settings.survivors)
     return False
 
 async def decide_missing_role(roles):
@@ -127,18 +127,22 @@ async def distribute_roles(roles):
     missing_role = await decide_missing_role(settings.roles)
     settings.roles += settings.cast['人狼'] * [2]
     settings.roles += settings.cast['妖狐'] * [7]
-    random.shuffle(settings.participants)
+    random.shuffle(settings.survivors)
     random.shuffle(settings.roles)
-    for idx in range(len(settings.participants)):
-        settings.allocation[settings.participants[idx]] = settings.roles[idx]
+    for idx in range(len(settings.survivors)):
+        settings.allocation[settings.survivors[idx].lower()] = settings.roles[idx]
 
 async def check_game_end(log_channel):
+    print(settings.survivors)
+    print(settings.allocation)
+    if settings.is_game_end:
+        return True
     num_wolves = 0
     num_foxes = 0
     for survivor in settings.survivors:
-        if settings.allocation[survivor] == 2:
+        if settings.allocation[survivor.lower()] == 2:
             num_wolves += 1
-        elif settings.allocation[survivor] == 7:
+        elif settings.allocation[survivor.lower()] == 7:
             num_foxes += 1
     if num_wolves == 0:
         if num_foxes == 0:
@@ -161,10 +165,53 @@ async def check_game_end(log_channel):
     return False
 
 async def count_rest_time(guild, log_channel, times_channel, t):
+    if t > 60:
+        notice_of_one_minute_remaining = False
+    else:
+        notice_of_one_minute_remaining = True
+    if t > 50:
+        notice_of_fifty_seconds_remaining = False
+    else:
+        notice_of_fifty_seconds_remaining = True
+    if t > 40:
+        notice_of_forty_seconds_remaining = False
+    else:
+        notice_of_forty_seconds_remaining = True
+    if t > 30:
+        notice_of_thirty_seconds_remaining = False
+    else:
+        notice_of_thirty_seconds_remaining = True
+    if t > 20:
+        notice_of_twenty_seconds_remaining = False
+    else:
+        notice_of_twenty_seconds_remaining = True
+    if t > 10:
+        notice_of_ten_seconds_remaining = False
+    else:
+        notice_of_ten_seconds_remaining = True
     t_start = time.time()
     while time.time() - t_start < t:
-        await times_channel.send(str(int(time.time() - t_start)))
-        await asyncio.sleep(10)
+        if settings.is_game_end:
+            return True
+        if not notice_of_one_minute_remaining and t - (time.time() - t_start) < 60:
+            notice_of_one_minute_remaining = True
+            await times_channel.send('残り1分です')
+        elif not notice_of_fifty_seconds_remaining and t - (time.time() - t_start) < 50:
+            notice_of_fifty_seconds_remaining = True
+            await times_channel.send('残り50秒です')
+        elif not notice_of_forty_seconds_remaining and t - (time.time() - t_start) < 40:
+            notice_of_forty_seconds_remaining = True
+            await times_channel.send('残り40秒です')
+        elif not notice_of_thirty_seconds_remaining and t - (time.time() - t_start) < 30:
+            notice_of_thirty_seconds_remaining = True
+            await times_channel.send('残り30秒です')
+        elif not notice_of_twenty_seconds_remaining and t - (time.time() - t_start) < 20:
+            notice_of_twenty_seconds_remaining = True
+            await times_channel.send('残り20秒です')
+        elif not notice_of_ten_seconds_remaining and t - (time.time() - t_start) < 10:
+            notice_of_ten_seconds_remaining = True
+            await times_channel.send('残り10秒です')
+        await asyncio.sleep(1)
     else:
         return False
     return True
